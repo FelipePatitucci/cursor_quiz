@@ -29,7 +29,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import TimerIcon from '@mui/icons-material/Timer';
 import DownloadIcon from '@mui/icons-material/Download';
 import { useGame } from '../contexts/GameContext';
-import { exportGame } from '../services/api';
+import { exportGame, getGameCharacters } from '../services/api';
+import GameResults from '../components/GameResults';
 
 const Game = () => {
   const navigate = useNavigate();
@@ -39,15 +40,28 @@ const Game = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [gameCharacters, setGameCharacters] = useState([]);
+  const [charactersLoading, setCharactersLoading] = useState(false);
+  const [gameEnded, setGameEnded] = useState(false);
+  const [localGameState, setLocalGameState] = useState(null);
   
   const inputRef = useRef(null);
   
-  // Redirect to dashboard if no active game
+  // Redirect to dashboard if no active game AND we're not showing results
   useEffect(() => {
-    if (!hasActiveGame) {
+    if (!hasActiveGame && !gameEnded && !showResults) {
       navigate('/');
     }
-  }, [hasActiveGame, navigate]);
+  }, [hasActiveGame, navigate, gameEnded, showResults]);
+  
+  // Store gameState locally when game ends
+  useEffect(() => {
+    if (gameState && gameState.completed && !gameEnded) {
+      setLocalGameState({...gameState});
+      setGameEnded(true);
+    }
+  }, [gameState, gameEnded]);
   
   // Focus input field when component mounts
   useEffect(() => {
@@ -62,6 +76,28 @@ const Game = () => {
       inputRef.current.focus();
     }
   }, [loading, gameState.completed]);
+
+  // Load characters data when game is completed
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      const gameDataToUse = gameEnded ? localGameState : gameState;
+      
+      if (gameDataToUse && gameDataToUse.completed && gameDataToUse.gameId && !showResults) {
+        try {
+          setCharactersLoading(true);
+          const response = await getGameCharacters(gameDataToUse.gameId);
+          setGameCharacters(response.data.characters);
+          setShowResults(true);
+        } catch (error) {
+          console.error('Error fetching game characters:', error);
+        } finally {
+          setCharactersLoading(false);
+        }
+      }
+    };
+
+    fetchCharacters();
+  }, [gameState.completed, gameState.gameId, showResults, gameEnded, localGameState]);
   
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -89,8 +125,17 @@ const Game = () => {
   // Handle ending the game
   const handleEndGame = async () => {
     try {
+      // Save current state before ending
+      setLocalGameState({...gameState, completed: true});
+      setGameEnded(true);
+      
+      // End the game in the backend
       await endGame();
-      setShowExportDialog(true);
+      
+      // Fetch characters for results
+      const response = await getGameCharacters(gameState.gameId);
+      setGameCharacters(response.data.characters);
+      setShowResults(true);
     } catch (err) {
       console.error('Error ending game:', err);
     }
@@ -102,13 +147,14 @@ const Game = () => {
       setExportLoading(true);
       setExportError('');
       
-      const response = await exportGame(gameState.gameId);
+      const gameId = gameEnded ? localGameState.gameId : gameState.gameId;
+      const response = await exportGame(gameId);
       
       // Create a download link
       const url = window.URL.createObjectURL(new Blob([JSON.stringify(response.data)]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `game_${gameState.gameId}_results.json`);
+      link.setAttribute('download', `game_${gameId}_results.json`);
       document.body.appendChild(link);
       link.click();
       
@@ -144,30 +190,124 @@ const Game = () => {
     };
   }, []);
 
+  // Use the appropriate game state
+  const activeGameState = gameEnded ? localGameState : gameState;
+
   // Calculate progress percentage
-  const progressPercentage = gameState.totalCharacters 
-    ? (gameState.correctGuesses / gameState.totalCharacters) * 100 
+  const progressPercentage = activeGameState.totalCharacters 
+    ? (activeGameState.correctGuesses / activeGameState.totalCharacters) * 100 
     : 0;
   
   // Get recent guesses (last 5)
-  const recentGuesses = gameState.guesses.slice(-5).reverse();
+  const recentGuesses = activeGameState.guesses.slice(-5).reverse();
+
+  // If showing results, transform characters data for the GameResults component
+  const prepareCharactersForResults = () => {
+    const correctlyGuessedIds = gameCharacters
+      .filter(char => char.was_guessed)
+      .map(char => char.id);
+    
+    return {
+      allCharacters: gameCharacters.map(char => ({
+        id: char.id,
+        name: char.name,
+        image: char.image,
+        role: char.role
+      })),
+      correctlyGuessed: correctlyGuessedIds,
+      animeTitle: activeGameState.animeTitle,
+      score: activeGameState.score,
+      totalGuesses: activeGameState.totalGuesses
+    };
+  };
+  
+  // If showing results, render GameResults component
+  if (showResults && gameCharacters.length > 0) {
+    return (
+      <Container maxWidth="lg">
+        <GameResults {...prepareCharactersForResults()} />
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/history')}
+          >
+            View Game History
+          </Button>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/')}
+          >
+            Back to Dashboard
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => setShowExportDialog(true)}
+          >
+            Export Results
+          </Button>
+        </Box>
+        
+        {/* Export dialog */}
+        <Dialog open={showExportDialog} onClose={() => setShowExportDialog(false)}>
+          <DialogTitle>Export Game Results</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Would you like to export your game results as a JSON file?
+            </DialogContentText>
+            
+            {exportError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {exportError}
+              </Alert>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowExportDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExportGame}
+              disabled={exportLoading}
+              variant="contained"
+              startIcon={exportLoading ? <CircularProgress size={20} /> : <DownloadIcon />}
+            >
+              {exportLoading ? 'Exporting...' : 'Export Results'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    );
+  }
+
+  // Loading state while fetching characters
+  if (charactersLoading) {
+    return (
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ ml: 2 }}>
+          Loading game results...
+        </Typography>
+      </Container>
+    );
+  }
   
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       {/* Header section */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h4" align="center" gutterBottom>
-          {gameState.animeTitle}
+          {activeGameState.animeTitle}
         </Typography>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="body1">
-            Progress: {gameState.correctGuesses} / {gameState.totalCharacters} characters
+            Progress: {activeGameState.correctGuesses} / {activeGameState.totalCharacters} characters
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <TimerIcon sx={{ mr: 1 }} />
             <Typography variant="body1">
-              {formatTime(gameState.elapsedTime)}
+              {formatTime(activeGameState.elapsedTime)}
             </Typography>
           </Box>
         </Box>
@@ -202,7 +342,7 @@ const Game = () => {
                   variant="outlined"
                   value={guess}
                   onChange={(e) => setGuess(e.target.value)}
-                  disabled={loading || gameState.completed}
+                  disabled={loading || activeGameState.completed}
                   inputRef={inputRef}
                   autoComplete="off"
                   autoFocus
@@ -211,7 +351,7 @@ const Game = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={loading || !guess.trim() || gameState.completed}
+                  disabled={loading || !guess.trim() || activeGameState.completed}
                   sx={{ ml: 1 }}
                 >
                   {loading ? <CircularProgress size={24} /> : 'Guess'}
@@ -270,7 +410,7 @@ const Game = () => {
               
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle1">
-                  Score: {gameState.score} points
+                  Score: {activeGameState.score} points
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Main characters: 3 points each
@@ -284,16 +424,16 @@ const Game = () => {
               
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle1">
-                  Total Guesses: {gameState.totalGuesses}
+                  Total Guesses: {activeGameState.totalGuesses}
                 </Typography>
                 <Typography variant="subtitle1">
-                  Accuracy: {gameState.totalGuesses > 0 ? Math.round((gameState.correctGuesses / gameState.totalGuesses) * 100) : 0}%
+                  Accuracy: {activeGameState.totalGuesses > 0 ? Math.round((activeGameState.correctGuesses / activeGameState.totalGuesses) * 100) : 0}%
                 </Typography>
               </Box>
               
               <Divider sx={{ my: 2 }} />
               
-              {gameState.completed ? (
+              {activeGameState.completed ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Chip 
                     label="Game Completed!" 
@@ -304,11 +444,11 @@ const Game = () => {
                   <Button
                     variant="contained"
                     color="primary"
-                    startIcon={<DownloadIcon />}
-                    onClick={() => setShowExportDialog(true)}
+                    onClick={() => setShowResults(true)}
                     fullWidth
+                    sx={{ mt: 2 }}
                   >
-                    Export Results
+                    View Results
                   </Button>
                 </Box>
               ) : (
@@ -325,36 +465,6 @@ const Game = () => {
           </Card>
         </Grid>
       </Grid>
-      
-      {/* Export dialog */}
-      <Dialog open={showExportDialog} onClose={() => setShowExportDialog(false)}>
-        <DialogTitle>Game Completed</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Congratulations! You've completed the game with a score of {gameState.score} points.
-            Would you like to export your game results?
-          </DialogContentText>
-          
-          {exportError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {exportError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => navigate('/history')}>
-            No, Go to History
-          </Button>
-          <Button
-            onClick={handleExportGame}
-            disabled={exportLoading}
-            variant="contained"
-            startIcon={exportLoading ? <CircularProgress size={20} /> : <DownloadIcon />}
-          >
-            {exportLoading ? 'Exporting...' : 'Export Results'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };

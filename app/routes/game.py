@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.game import Game, Guess
-from app.utils.anilist import prepare_for_game_anilist
+from app.utils.anilist import prepare_for_game_anilist, get_characters_from_anime
 
 game_bp = Blueprint("game", __name__, url_prefix="/api")
 
@@ -315,3 +315,63 @@ def get_leaderboard():
         )
 
     return jsonify({"leaderboard": leaderboard}), 200
+
+
+@game_bp.route("/game/characters/<int:game_id>", methods=["GET"])
+@login_required
+def get_game_characters(game_id):
+    """Get all characters for a completed game, showing which were guessed correctly."""
+    game = Game.query.get(game_id)
+
+    if not game or game.user_id != current_user.id:
+        return jsonify({"error": "Game not found"}), 404
+
+    # Get all guesses for this game
+    guesses = Guess.query.filter_by(game_id=game_id).all()
+    correct_guesses = [g.character_name for g in guesses if int(g.is_correct)]
+
+    # Get all characters for this anime
+    try:
+        character_data = get_characters_from_anime(anime_id=game.anime_id)
+        all_characters = []
+
+        for char in character_data["data"]:
+            names = char["name"]
+            first_name = names["first"] if names["first"] is not None else ""
+            last_name = names["last"] if names["last"] is not None else ""
+            display_name = f"{last_name} {first_name}".strip()
+
+            # Check if this character was guessed correctly
+            was_guessed = any(
+                guess.lower() == display_name.lower() for guess in correct_guesses
+            )
+
+            all_characters.append(
+                {
+                    "id": char["id"],
+                    "name": display_name,
+                    "native_name": names.get("native", ""),
+                    "image": char["image"],
+                    "role": char["role"],
+                    "favourites": char["favourites"],
+                    "was_guessed": was_guessed,
+                }
+            )
+
+        return jsonify(
+            {
+                "game_id": game_id,
+                "anime_title": game.anime_title,
+                "total_characters": len(all_characters),
+                "characters": all_characters,
+                "correct_guesses": game.correct_guesses,
+                "total_guesses": game.total_guesses,
+                "score": game.score,
+                "completed": game.completed,
+            }
+        ), 200
+
+    except Exception as e:
+        print(f"Error retrieving characters: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"error": f"Failed to retrieve characters: {str(e)}"}), 500

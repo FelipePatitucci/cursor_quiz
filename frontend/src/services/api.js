@@ -58,6 +58,10 @@ export const getGame = (gameId) => {
   return apiClient.get(`/game/${gameId}`);
 };
 
+export const getGameCharacters = (gameId) => {
+  return apiClient.get(`/game/characters/${gameId}`);
+};
+
 export const exportGame = (gameId) => {
   return apiClient.get(`/game/export/${gameId}`, { responseType: 'blob' });
 };
@@ -78,6 +82,7 @@ export default {
   endGame,
   getGames,
   getGame,
+  getGameCharacters,
   exportGame,
   getLeaderboard,
 }; 
