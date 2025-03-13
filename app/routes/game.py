@@ -1,10 +1,12 @@
-import os
 import json
+import os
 import time
 import traceback
 from datetime import datetime
-from flask import Blueprint, jsonify, request, session, send_file, current_app
+
+from flask import Blueprint, jsonify, request, session, send_file
 from flask_login import login_required, current_user
+
 from app import db
 from app.models.user import User
 from app.models.game import Game, Guess
@@ -28,7 +30,7 @@ def game_state():
         session.pop("game_id", None)
         session.pop("map_char_and_names", None)
         session.pop("map_index_to_infos", None)
-        session.pop("guessed_indices", None)
+        session.pop("guessed_indexes", None)
         return jsonify({"active": False, "message": "No valid game found"}), 200
 
     return jsonify(
@@ -52,7 +54,7 @@ def start_game():
     session.pop("game_id", None)
     session.pop("map_char_and_names", None)
     session.pop("map_index_to_infos", None)
-    session.pop("guessed_indices", None)
+    session.pop("guessed_indexes", None)
 
     data = request.get_json()
 
@@ -93,7 +95,7 @@ def start_game():
         session["map_index_to_infos"] = {
             str(k): v for k, v in map_index_to_infos.items()
         }
-        session["guessed_indices"] = []
+        session["guessed_indexes"] = []
 
         # Ensure session is saved
         session.modified = True
@@ -138,11 +140,11 @@ def make_guess():
     user_input = data["guess"].strip().lower()
     map_char_and_names = session.get("map_char_and_names", {})
     map_index_to_infos = session.get("map_index_to_infos", {})
-    guessed_indices = session.get("guessed_indices", [])
+    guessed_indexes = session.get("guessed_indexes", [])
 
     print(f"Processing guess: '{user_input}' for game {game_id}")
     print(
-        f"Session data: characters={len(map_char_and_names)}, indices={len(guessed_indices)}"
+        f"Session data: characters={len(map_char_and_names)}, indices={len(guessed_indexes)}"
     )
 
     # Process the guess
@@ -156,7 +158,7 @@ def make_guess():
         idx = map_char_and_names[user_input]
         idx_str = str(idx)
 
-        if idx not in guessed_indices:
+        if idx not in guessed_indexes:
             is_correct = True
             entry = map_index_to_infos[idx_str]
             character_name = entry["names"][0]
@@ -167,8 +169,8 @@ def make_guess():
             game.correct_guesses += 1
 
             # Add to guessed indices
-            guessed_indices.append(idx)
-            session["guessed_indices"] = guessed_indices
+            guessed_indexes.append(idx)
+            session["guessed_indexes"] = guessed_indexes
 
             # Remove all variations for the guessed character
             for name in entry["names"]:
@@ -196,7 +198,7 @@ def make_guess():
         session.pop("game_id", None)
         session.pop("map_char_and_names", None)
         session.pop("map_index_to_infos", None)
-        session.pop("guessed_indices", None)
+        session.pop("guessed_indexes", None)
 
     db.session.commit()
 
@@ -241,7 +243,7 @@ def end_game():
     session.pop("game_id", None)
     session.pop("map_char_and_names", None)
     session.pop("map_index_to_infos", None)
-    session.pop("guessed_indices", None)
+    session.pop("guessed_indexes", None)
 
     db.session.commit()
 

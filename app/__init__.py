@@ -1,20 +1,19 @@
 import os
-from flask import Flask, session
+from datetime import timedelta
+
+import secrets
+from flask import Flask
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_session import Session
-from datetime import datetime, timedelta
-import secrets
+
+from app.utils.utils import ensure_dir_exists
 
 # Initialize extensions before app creation (without binding to specific app)
 db = SQLAlchemy()
 login_manager = LoginManager()
 sess = Session()
-
-# Import function from app utils
-from app.utils.utils import ensure_dir_exists
-
 
 def create_app(test_config=None):
     # Initialize Flask app
@@ -53,8 +52,8 @@ def create_app(test_config=None):
 
     with app.app_context():
         # Import models to ensure they're known to SQLAlchemy
-        from app.models.user import User
-        from app.models.game import Game, Guess
+        # from app.models.user import User
+        # from app.models.game import Game, Guess
 
         # Create database tables
         db.create_all()

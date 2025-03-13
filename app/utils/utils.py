@@ -19,40 +19,6 @@ def ensure_dir_exists(directory_path: str) -> None:
         print(f"Directory '{directory_path}' created.")
 
 
-def game_stats(
-    anime_selected: str,
-    total_guesses: int,
-    correct_count: int,
-    total_characters: int,
-    last_guesses: list[str],
-    score: int,
-) -> None:
-    print(f"\nAnime: '{anime_selected}'")
-    print(f"Stats:\nGuesses made: {total_guesses}")
-    print(f"Progress: {correct_count}/{total_characters} characters!")
-    print(f"Last 5 guesses: {', '.join(last_guesses[-5:])}\n")
-    print(f"Score: {score}")
-
-
-def display_remaining(
-    guessed_indices: set[int],
-    index_to_names: dict[int, list[str]],
-) -> None:
-    print("Characters Remaining:\n")
-    for idx, infos in index_to_names.items():
-        if idx in guessed_indices:
-            continue
-        print(
-            "%s (native: %s) (%s)\n  - Image: %s\n"
-            % (
-                infos["names"][0].upper(),
-                infos["names"][-1],
-                infos["role"],
-                infos["image"],
-            )
-        )
-
-
 def today_date_string() -> str:
     """
     Returns the current date in the format YYYY-MM-DD.
