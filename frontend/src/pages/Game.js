@@ -56,6 +56,13 @@ const Game = () => {
     }
   }, []);
   
+  // Refocus input field after loading state changes
+  useEffect(() => {
+    if (!loading && inputRef.current && !gameState.completed) {
+      inputRef.current.focus();
+    }
+  }, [loading, gameState.completed]);
+  
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,9 +76,11 @@ const Game = () => {
       setGuess('');
       
       // Focus back on input field
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 0);
     } catch (err) {
       console.error('Error making guess:', err);
     }
@@ -117,6 +126,24 @@ const Game = () => {
     }
   };
   
+  // Handle keypress events
+  const handleKeyDown = (e) => {
+    // If not in an input field and a letter/number is pressed, focus the input field
+    if (!e.target.tagName.match(/input|textarea/i) && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  };
+  
+  // Add global key event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Calculate progress percentage
   const progressPercentage = gameState.totalCharacters 
     ? (gameState.correctGuesses / gameState.totalCharacters) * 100 
@@ -178,6 +205,7 @@ const Game = () => {
                   disabled={loading || gameState.completed}
                   inputRef={inputRef}
                   autoComplete="off"
+                  autoFocus
                 />
                 <Button
                   type="submit"
