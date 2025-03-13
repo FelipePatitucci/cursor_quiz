@@ -3,19 +3,57 @@ import json
 import time
 import traceback
 from datetime import datetime
-from flask import Blueprint, jsonify, request, session, send_file
+from flask import Blueprint, jsonify, request, session, send_file, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.game import Game, Guess
-from lib.anilist import prepare_for_game_anilist
+from app.utils.anilist import prepare_for_game_anilist
 
 game_bp = Blueprint("game", __name__, url_prefix="/api")
+
+
+@game_bp.route("/game/state", methods=["GET"])
+@login_required
+def game_state():
+    """Get the current game state for debugging."""
+    if "game_id" not in session:
+        return jsonify({"active": False, "message": "No active game"}), 200
+
+    game_id = session.get("game_id")
+    game = Game.query.get(game_id)
+
+    if not game or game.user_id != current_user.id:
+        # Clear invalid session data
+        session.pop("game_id", None)
+        session.pop("map_char_and_names", None)
+        session.pop("map_index_to_infos", None)
+        session.pop("guessed_indices", None)
+        return jsonify({"active": False, "message": "No valid game found"}), 200
+
+    return jsonify(
+        {
+            "active": True,
+            "game_id": game_id,
+            "anime_title": game.anime_title,
+            "total_characters": game.total_characters,
+            "correct_guesses": game.correct_guesses,
+            "total_guesses": game.total_guesses,
+            "completed": game.completed,
+            "score": game.score,
+        }
+    ), 200
 
 
 @game_bp.route("/game/start", methods=["POST"])
 @login_required
 def start_game():
+    # Clear any existing game session data first
+    session.pop("game_id", None)
+    session.pop("map_char_and_names", None)
+    session.pop("map_index_to_infos", None)
+    session.pop("guessed_indices", None)
+
     data = request.get_json()
 
     if not data or not data.get("anime_id") or not data.get("anime_title"):
@@ -59,6 +97,7 @@ def start_game():
 
         # Ensure session is saved
         session.modified = True
+        print(f"Session set: game_id={session.get('game_id')}")
 
         return jsonify(
             {
@@ -77,6 +116,8 @@ def start_game():
 @game_bp.route("/game/guess", methods=["POST"])
 @login_required
 def make_guess():
+    print(f"Current session: game_id={session.get('game_id')}")
+
     if "game_id" not in session:
         return jsonify({"error": "No active game"}), 400
 
@@ -98,6 +139,11 @@ def make_guess():
     map_char_and_names = session.get("map_char_and_names", {})
     map_index_to_infos = session.get("map_index_to_infos", {})
     guessed_indices = session.get("guessed_indices", [])
+
+    print(f"Processing guess: '{user_input}' for game {game_id}")
+    print(
+        f"Session data: characters={len(map_char_and_names)}, indices={len(guessed_indices)}"
+    )
 
     # Process the guess
     game.total_guesses += 1
@@ -153,6 +199,9 @@ def make_guess():
         session.pop("guessed_indices", None)
 
     db.session.commit()
+
+    # Ensure session is saved
+    session.modified = True
 
     return jsonify(
         {

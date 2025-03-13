@@ -1,17 +1,19 @@
 import os
-from flask import Flask
+from flask import Flask, session
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from flask_session import Session
+from datetime import datetime, timedelta
 import secrets
 
 # Initialize extensions before app creation (without binding to specific app)
 db = SQLAlchemy()
 login_manager = LoginManager()
+sess = Session()
 
-# Import function from original game
-from lib.utils import ensure_dir_exists
+# Import function from app utils
+from app.utils.utils import ensure_dir_exists
 
 
 def create_app(test_config=None):
@@ -23,12 +25,26 @@ def create_app(test_config=None):
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///anime_quiz.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # Ensure the session directory exists
+    os.makedirs("flask_session", exist_ok=True)
+
+    # Session configuration
+    app.config["SESSION_TYPE"] = "filesystem"
+    app.config["SESSION_FILE_DIR"] = "flask_session"
+    app.config["SESSION_PERMANENT"] = True
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=2)
+    app.config["SESSION_COOKIE_SECURE"] = False  # Set to True in production with HTTPS
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_USE_SIGNER"] = True
+
     # Initialize extensions with the app
     db.init_app(app)
     login_manager.init_app(app)
+    sess.init_app(app)
 
-    # Enable CORS
-    CORS(app)
+    # Enable CORS with credentials support
+    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
 
     # Ensure data directories exist
     ensure_dir_exists("./data/characters/")

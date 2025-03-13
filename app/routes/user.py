@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from app import db
-from lib.anilist import get_animes_from_user
+from app.utils.anilist import get_animes_from_user
 
 user_bp = Blueprint("user", __name__, url_prefix="/api")
 

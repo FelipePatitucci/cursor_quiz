@@ -55,6 +55,7 @@ yarn-error.log*
 !data/games/.gitkeep
 *.db
 anime_quiz.db
+flask_session/
 
 # Logs
 *.log 
