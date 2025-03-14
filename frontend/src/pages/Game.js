@@ -23,6 +23,7 @@ import {
   DialogActions,
   Chip,
   LinearProgress,
+  Avatar,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -50,18 +51,34 @@ const Game = () => {
   
   // Redirect to dashboard if no active game AND we're not showing results
   useEffect(() => {
-    if (!hasActiveGame && !gameEnded && !showResults) {
+    // If no game ID at all, redirect to dashboard
+    if (!gameState.gameId) {
       navigate('/');
+      return;
     }
-  }, [hasActiveGame, navigate, gameEnded, showResults]);
-  
-  // Store gameState locally when game ends
-  useEffect(() => {
-    if (gameState && gameState.completed && !gameEnded) {
+    
+    // If there's a completed game in the context but we're not in gameEnded state or showing results yet
+    if (gameState.completed && !gameEnded && !showResults) {
       setLocalGameState({...gameState});
       setGameEnded(true);
+      
+      // Fetch characters for results
+      const fetchCompletedGameResults = async () => {
+        try {
+          setCharactersLoading(true);
+          const response = await getGameCharacters(gameState.gameId);
+          setGameCharacters(response.data.characters);
+          setShowResults(true);
+        } catch (error) {
+          console.error('Error fetching completed game characters:', error);
+        } finally {
+          setCharactersLoading(false);
+        }
+      };
+      
+      fetchCompletedGameResults();
     }
-  }, [gameState, gameEnded]);
+  }, [gameState, navigate, gameEnded, showResults]);
   
   // Focus input field when component mounts
   useEffect(() => {
@@ -77,28 +94,6 @@ const Game = () => {
     }
   }, [loading, gameState.completed]);
 
-  // Load characters data when game is completed
-  useEffect(() => {
-    const fetchCharacters = async () => {
-      const gameDataToUse = gameEnded ? localGameState : gameState;
-      
-      if (gameDataToUse && gameDataToUse.completed && gameDataToUse.gameId && !showResults) {
-        try {
-          setCharactersLoading(true);
-          const response = await getGameCharacters(gameDataToUse.gameId);
-          setGameCharacters(response.data.characters);
-          setShowResults(true);
-        } catch (error) {
-          console.error('Error fetching game characters:', error);
-        } finally {
-          setCharactersLoading(false);
-        }
-      }
-    };
-
-    fetchCharacters();
-  }, [gameState.completed, gameState.gameId, showResults, gameEnded, localGameState]);
-  
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -294,11 +289,33 @@ const Game = () => {
   
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      {/* Header section */}
+      {/* Header section with anime cover image */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h4" align="center" gutterBottom>
-          {activeGameState.animeTitle}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          {activeGameState.coverImage && (
+            <Avatar 
+              src={activeGameState.coverImage} 
+              alt={activeGameState.animeTitle}
+              variant="rounded"
+              sx={{ 
+                width: 80, 
+                height: 120, 
+                mr: 2,
+                objectFit: 'cover',
+                border: '1px solid rgba(0, 0, 0, 0.12)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}
+            />
+          )}
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              {activeGameState.animeTitle}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Guess the characters from this anime
+            </Typography>
+          </Box>
+        </Box>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="body1">

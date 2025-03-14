@@ -56,6 +56,10 @@ query ($userName: String!, $chunk: Int!, $perChunk: Int!) {
           },
           status,
           episodes,
+          coverImage {
+            large
+          },
+          bannerImage
         }
       }
     },

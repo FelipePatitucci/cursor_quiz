@@ -26,6 +26,9 @@ const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { hasActiveGame, gameState, endGame } = useGame();
   
+  // Check if there's a completed game available for results
+  const hasGameResults = gameState.gameId && gameState.completed;
+  
   const [anchorElNav, setAnchorElNav] = useState(null);
   const [anchorElUser, setAnchorElUser] = useState(null);
 
@@ -125,6 +128,12 @@ const Navbar = () => {
                 </MenuItem>
               )}
               
+              {hasGameResults && (
+                <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/game'); }}>
+                  <Typography textAlign="center">Game Results</Typography>
+                </MenuItem>
+              )}
+              
               {isAuthenticated && (
                 <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/history'); }}>
                   <Typography textAlign="center">Game History</Typography>
@@ -182,6 +191,17 @@ const Navbar = () => {
               </Button>
             )}
             
+            {hasGameResults && (
+              <Button
+                component={RouterLink}
+                to="/game"
+                onClick={handleCloseNavMenu}
+                sx={{ my: 2, color: 'white', display: 'block' }}
+              >
+                Game Results
+              </Button>
+            )}
+            
             {isAuthenticated && (
               <Button
                 component={RouterLink}
@@ -211,6 +231,18 @@ const Navbar = () => {
               </Typography>
               <Typography variant="body2">
                 {gameState.correctGuesses}/{gameState.totalCharacters}
+              </Typography>
+            </Box>
+          )}
+          
+          {/* Game results info */}
+          {hasGameResults && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+              <Typography variant="body2" sx={{ mr: 1 }}>
+                {gameState.animeTitle}
+              </Typography>
+              <Typography variant="body2" color="success.main">
+                Complete: {gameState.correctGuesses}/{gameState.totalCharacters}
               </Typography>
             </Box>
           )}

@@ -18,19 +18,28 @@ export const GameProvider = ({ children }) => {
     startTime: null,
     timerInterval: null,
     elapsedTime: 0,
+    coverImage: null,
+    bannerImage: null,
+    completedAt: null,
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Start a new game
-  const handleStartGame = async (animeId, animeTitle) => {
+  const handleStartGame = async (animeId, animeTitle, coverImage, bannerImage, completedAt) => {
     try {
       setLoading(true);
       
-      // End any existing game
+      // Reset game state completely instead of trying to end a completed game
       if (gameState.gameId) {
-        await handleEndGame();
+        // If the game is still active, end it properly
+        if (!gameState.completed) {
+          await endGame();
+        } else {
+          // If the game is already completed, just reset the state
+          resetGame();
+        }
       }
       
       const response = await startGame(animeId, animeTitle);
@@ -56,6 +65,9 @@ export const GameProvider = ({ children }) => {
         startTime,
         timerInterval,
         elapsedTime: 0,
+        coverImage,
+        bannerImage,
+        completedAt,
       });
       
       setError(null);
@@ -133,20 +145,12 @@ export const GameProvider = ({ children }) => {
       
       const response = await endGame();
       
-      // Reset game state
-      setGameState({
-        gameId: null,
-        animeTitle: '',
-        totalCharacters: 0,
-        correctGuesses: 0,
-        totalGuesses: 0,
-        score: 0,
-        completed: false,
-        guesses: [],
-        startTime: null,
+      // Update game state but don't fully reset it to preserve game data for results
+      setGameState(prevState => ({
+        ...prevState,
+        completed: true,
         timerInterval: null,
-        elapsedTime: 0,
-      });
+      }));
       
       setError(null);
       return response.data;
@@ -177,6 +181,9 @@ export const GameProvider = ({ children }) => {
       startTime: null,
       timerInterval: null,
       elapsedTime: 0,
+      coverImage: null,
+      bannerImage: null,
+      completedAt: null,
     });
     
     setError(null);
@@ -199,7 +206,7 @@ export const GameProvider = ({ children }) => {
     endGame: handleEndGame,
     resetGame,
     formatTime,
-    hasActiveGame: !!gameState.gameId,
+    hasActiveGame: !!gameState.gameId && !gameState.completed,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

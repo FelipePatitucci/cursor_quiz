@@ -53,6 +53,9 @@ def get_animes():
                         "status": status,
                         "episodes": anime["media"]["episodes"],
                         "score": anime["score"],
+                        "cover_image": anime["media"]["coverImage"]["large"],
+                        "banner_image": anime["media"]["bannerImage"],
+                        "completed_at": anime["completedAt"],
                     }
                 )
 

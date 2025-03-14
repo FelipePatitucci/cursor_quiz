@@ -212,10 +212,16 @@ def prepare_for_game_anilist(
     map_index_to_infos = {}
 
     for idx, char in enumerate(res):
-        names = char["name"]
+        names = char.get("name", {})
+
+        if not names:
+            print(f"No names found for character {char}")
+            continue
+
+        print(names)
         fn = names["first"] if names["first"] is not None else ""
         ln = names["last"] if names["last"] is not None else ""
-        native = names.get("native", "").replace(" ", "")
+        native = names["native"].replace(" ", "") if names["native"] is not None else ""
         alternatives = names["alternative"]
 
         # applying cut

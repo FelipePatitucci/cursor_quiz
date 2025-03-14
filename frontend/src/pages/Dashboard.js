@@ -84,7 +84,13 @@ const Dashboard = () => {
     
     try {
       setLoading(true);
-      await startGame(selectedAnime.id, selectedAnime.title.english || selectedAnime.title.romaji);
+      await startGame(
+        selectedAnime.id, 
+        selectedAnime.title.english || selectedAnime.title.romaji,
+        selectedAnime.cover_image,
+        selectedAnime.banner_image,
+        selectedAnime.completed_at
+      );
       navigate('/game');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start game');
@@ -132,6 +138,32 @@ const Dashboard = () => {
               onClick={handleContinueGame}
             >
               Continue Game
+            </Button>
+          </CardActions>
+        </Card>
+      )}
+      
+      {/* Completed game results card */}
+      {!hasActiveGame && gameState.gameId && gameState.completed && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h5" component="div">
+              Completed Game: {gameState.animeTitle}
+            </Typography>
+            <Typography variant="body1">
+              Found: {gameState.correctGuesses} / {gameState.totalCharacters} characters
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Final Score: {gameState.score} points
+            </Typography>
+          </CardContent>
+          <CardActions>
+            <Button 
+              variant="contained" 
+              color="success" 
+              onClick={handleContinueGame}
+            >
+              View Results
             </Button>
           </CardActions>
         </Card>
