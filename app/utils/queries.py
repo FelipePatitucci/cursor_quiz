@@ -28,19 +28,20 @@ query ($animeId: Int!, $page: Int!) {
 }
 """
 query_animes_from_user = """
-query ($userName: String!, $chunk: Int!, $perChunk: Int!) {
+query ($userName: String!, $chunk: Int!, $perChunk: Int!, $status: MediaListStatus!) {
   MediaListCollection (
     userName: $userName,
     type: ANIME,
     sort: SCORE_DESC,
     chunk: $chunk,
     perChunk: $perChunk,
-    status_not: PLANNING
+    status: $status
   ) {
     lists {
       status,
       entries {
         score(format: POINT_10_DECIMAL),
+        status,
         progress,
         private,
         completedAt {

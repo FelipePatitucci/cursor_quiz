@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 
 import requests
 
-from app.utils.configs import characters_path, users_path
+from app.utils.configs import characters_path, users_path, status_list
 from app.utils.queries import (
     query_animes_from_user,
     query_characters_from_anime,
@@ -93,7 +93,7 @@ def get_animes_from_user(username: str, chunk_size: int = 200) -> dict[str, str]
     user_data = {
         "user": user_info["data"]["User"],
         "animeList": {
-            "allStatus": [],
+            "allStatus": status_list,
         },
         "last_updated": today_date_string(),
     }
@@ -108,30 +108,48 @@ def get_animes_from_user(username: str, chunk_size: int = 200) -> dict[str, str]
             # still fresh enough
             return cache_result
 
-    variables = {"userName": username, "chunk": 1, "perChunk": chunk_size}
+    variables = {
+        "userName": username,
+        "chunk": 1,
+        "perChunk": chunk_size,
+        "status": "",
+    }
+    already_processed = set()
 
-    while True:
-        res = get_data(URL, query_animes_from_user, variables, process_fn=return_json)
-        data = res["data"]["MediaListCollection"]
+    for status in status_list:
+        variables["chunk"] = 1
+        variables["status"] = status
 
-        for item in data["lists"]:
-            status = item["status"].lower()
+        while True:
+            res = get_data(
+                URL, query_animes_from_user, variables, process_fn=return_json
+            )
+            data = res["data"]["MediaListCollection"]
 
-            if status in user_data["animeList"]["allStatus"]:
-                user_data["animeList"][status] += item["entries"]
-            else:
-                user_data["animeList"]["allStatus"].append(status)
-                user_data["animeList"][status] = item["entries"]
+            for item in data["lists"]:
+                # remove duplicates
+                for entry in item["entries"]:
+                    current_id = entry["media"]["id"]
+                    if current_id in already_processed:
+                        print(entry)
+                        continue
 
-        if not data["hasNextChunk"]:
-            break
+                    if status in user_data["animeList"]:
+                        user_data["animeList"][status].append(entry)
+                    else:
+                        user_data["animeList"][status] = [entry]
 
-        variables["chunk"] += 1
+                    already_processed.add(current_id)
+
+            if not data["hasNextChunk"]:
+                break
+
+            variables["chunk"] += 1
 
     ensure_dir_exists(users_path)
     # caching data
     print("Caching info...")
-    with open(file=filepath, mode="w+", encoding="utf-8") as f:
+    with open(file=filepath, mode="w", encoding="utf-8") as f:
         json.dump(user_data, f, indent=4)
 
     return user_data
@@ -180,7 +198,7 @@ def get_characters_from_anime(anime_id: int = 12189) -> dict[str, str]:
     }
 
     # caching data
-    with open(file=filepath, mode="w+", encoding="utf-8") as f:
+    with open(file=filepath, mode="w", encoding="utf-8") as f:
         json.dump(character_data, f, indent=4)
 
     return character_data
